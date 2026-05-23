@@ -171,6 +171,10 @@ function renderGithubResults() {
   }
 
   for (const repository of state.githubResults) {
+    const packageLines = (repository.pluginPackages && repository.pluginPackages.length > 1)
+      ? `<div class="plugin-meta">Packages: ${repository.pluginPackages.map((pkg) => `${escapeHtml(pkg.pluginId)} (${escapeHtml(pkg.packagePath)})`).join(', ')}</div>`
+      : '';
+
     const option = document.createElement('option');
     option.value = repository.cloneUrl;
     option.disabled = repository.installed === true || repository.packageReadable === false;

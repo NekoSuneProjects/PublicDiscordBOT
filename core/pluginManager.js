@@ -503,8 +503,9 @@ class PluginManager {
       logger: this.logger
     });
 
+    const packagePath = options.packagePath || 'package.json';
     const remote = parseGithubRepositoryUrl(source)
-      ? await getGithubRemotePluginInfo(source).catch((error) => {
+      ? await getGithubRemotePluginInfo(source, packagePath).catch((error) => {
         this.logger.warning('Unable to read GitHub plugin metadata after install', { source, error });
         return null;
       })
@@ -522,6 +523,7 @@ class PluginManager {
       repository: result.manifest.repository || remote?.manifest.repository,
       githubUrl: result.manifest.githubUrl || remote?.manifest.githubUrl,
       sourceType: remote ? 'github' : 'remote',
+      packagePath,
       sourcePushedAt: remote?.repository.pushedAt,
       updateAvailable: false,
       latestCheckedAt: remote ? new Date().toISOString() : undefined,
@@ -560,7 +562,7 @@ class PluginManager {
     }
 
     const { manifest: localManifest } = await validatePluginDirectory(discovered.path);
-    const remote = await getGithubRemotePluginInfo(source);
+    const remote = await getGithubRemotePluginInfo(source, state.packagePath || state.latestPackagePath || 'package.json');
     const remoteVersionNewer = compareVersions(remote.manifest.version, localManifest.version) > 0;
     const sourceChanged = isNewerDate(remote.repository.pushedAt, state.sourcePushedAt);
     const updateAvailable = remoteVersionNewer || sourceChanged;
@@ -624,8 +626,9 @@ class PluginManager {
     await this.unloadPlugin(pluginId);
 
     const securityConfig = this.configManager.getCore('security', {});
+    const packagePath = state.packagePath || state.latestPackagePath || 'package.json';
     const result = await installPluginFromSource(source, {
-      packagePath: options.packagePath || null,
+      packagePath,
       pluginsDirectory: this.pluginsDirectory(),
       allowedHosts: securityConfig.allowedPluginHosts || [],
       allowRemoteInstall: securityConfig.allowRemotePluginInstall !== false,
@@ -635,7 +638,7 @@ class PluginManager {
       expectedPluginId: pluginId,
       logger: this.logger
     });
-    const remote = await getGithubRemotePluginInfo(source).catch((error) => {
+    const remote = await getGithubRemotePluginInfo(source, packagePath).catch((error) => {
       this.logger.warning('Unable to read GitHub plugin metadata after update', { pluginId, source, error });
       return null;
     });
@@ -645,6 +648,7 @@ class PluginManager {
       enabled: wasEnabled,
       source,
       sourceType: 'github',
+      packagePath,
       name: result.manifest.name,
       version: result.manifest.version,
       previousVersion,

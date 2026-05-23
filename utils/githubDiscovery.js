@@ -239,18 +239,24 @@ async function getGithubRepositoryInfo(source) {
   };
 }
 
-async function getGithubRemotePluginInfo(source) {
+async function getGithubRemotePluginInfo(source, packagePath) {
   const repository = await getGithubRepositoryInfo(source);
   if (!repository) {
     throw new Error('Plugin source is not a GitHub repository URL.');
   }
 
-  const { pkg, packagePath } = await findRemotePackage(repository.owner, repository.repo, repository.defaultBranch);
+  const resolved = packagePath
+    ? {
+      packagePath,
+      pkg: await fetchPackageJsonAt(repository.owner, repository.repo, packagePath, repository.defaultBranch)
+    }
+    : await findRemotePackage(repository.owner, repository.repo, repository.defaultBranch);
+
   return {
     repository,
-    packagePath,
-    package: pkg,
-    manifest: pluginManifestFromPackage(pkg, repository)
+    packagePath: resolved.packagePath,
+    package: resolved.pkg,
+    manifest: pluginManifestFromPackage(resolved.pkg, repository)
   };
 }
 
