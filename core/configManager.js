@@ -1,6 +1,7 @@
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const fs = require('fs-extra');
+const { applyEnvOverrides } = require('./envConfig');
 
 function isObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
@@ -47,6 +48,7 @@ class ConfigManager extends EventEmitter {
     this.pluginRegistryPath = path.resolve(this.rootDir, options.pluginRegistryPath || 'config/plugins.json');
     this.pluginConfigDirectory = path.resolve(this.rootDir, options.pluginConfigDirectory || 'config/plugins');
     this.core = {};
+    this.fileCore = {};
     this.pluginRegistry = { plugins: {} };
     this.pluginConfigs = new Map();
     this.watcher = null;
@@ -81,14 +83,16 @@ class ConfigManager extends EventEmitter {
   }
 
   async reloadCore() {
-    this.core = await this.readJson(this.corePath, {});
+    this.fileCore = await this.readJson(this.corePath, {});
+    this.core = applyEnvOverrides(this.fileCore);
     this.emit('coreChanged', this.core);
     return this.core;
   }
 
   async saveCore(nextCore) {
-    this.core = nextCore;
+    this.fileCore = nextCore;
     await this.writeJson(this.corePath, nextCore);
+    this.core = applyEnvOverrides(this.fileCore);
     this.emit('coreChanged', this.core);
   }
 

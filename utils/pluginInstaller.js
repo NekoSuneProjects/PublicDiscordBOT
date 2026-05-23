@@ -139,7 +139,12 @@ async function extractZipSafely(zipPath, destination) {
   zip.extractAllTo(destination, true);
 }
 
-async function findPluginRoot(directory) {
+async function findPluginRoot(directory, packagePath) {
+  if (packagePath) {
+    const explicit = path.resolve(directory, packagePath.replace(/\/package\.json$/, '').split('/').join(path.sep));
+    if (await fs.pathExists(path.join(explicit, 'package.json'))) return explicit;
+  }
+
   const directPackage = path.join(directory, 'package.json');
   if (await fs.pathExists(directPackage)) return directory;
 
@@ -163,6 +168,7 @@ async function installPluginFromSource(source, options) {
     maxArchiveBytes = 50 * 1024 * 1024,
     overwrite = false,
     expectedPluginId = null,
+    packagePath = null,
     logger
   } = options;
 
@@ -195,7 +201,7 @@ async function installPluginFromSource(source, options) {
       await extractZipSafely(archivePath, sourceDirectory);
     }
 
-    const pluginRoot = await findPluginRoot(sourceDirectory);
+    const pluginRoot = await findPluginRoot(sourceDirectory, packagePath);
     const { manifest } = await validatePluginDirectory(pluginRoot);
     if (expectedPluginId && manifest.id !== expectedPluginId) {
       throw new Error(`Updated plugin id mismatch. Expected "${expectedPluginId}", got "${manifest.id}".`);

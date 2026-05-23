@@ -194,10 +194,13 @@ function renderGithubResults() {
         <div class="plugin-meta">Author: ${escapeHtml(repository.author || repository.owner || 'unknown')}</div>
         <div class="plugin-meta">${escapeHtml(repository.fullName)} - ${escapeHtml(repository.language || 'Unknown')} - ${repository.stars} stars - ${repository.forks} forks</div>
         ${repository.packageError ? `<div class="plugin-meta level-error">${escapeHtml(repository.packageError)}</div>` : ''}
+        ${packageLines}
         <div class="plugin-title">${topics}</div>
       </div>
       <div class="plugin-actions">
-        <button class="button primary" data-install-github="${escapeHtml(repository.cloneUrl)}" ${repository.installed || repository.packageReadable === false ? 'disabled' : ''}>Install</button>
+        ${(repository.pluginPackages && repository.pluginPackages.length > 1)
+          ? repository.pluginPackages.map((pkg) => `<button class="button primary" data-install-github="${escapeHtml(repository.cloneUrl)}" data-package-path="${escapeHtml(pkg.packagePath)}" ${pkg.installed || repository.packageReadable === false ? 'disabled' : ''}>Install ${escapeHtml(pkg.pluginId)}</button>`).join('')
+          : `<button class="button primary" data-install-github="${escapeHtml(repository.cloneUrl)}" data-package-path="${escapeHtml(repository.packagePath || 'package.json')}" ${repository.installed || repository.packageReadable === false ? 'disabled' : ''}>Install</button>`}
       </div>
     `;
     list.appendChild(row);
@@ -343,12 +346,14 @@ function bindActions() {
     const button = event.target.closest('button[data-install-github]');
     if (!button) return;
 
-    await installGithubSource(button.dataset.installGithub);
+    await installGithubSource(button.dataset.installGithub, button.dataset.packagePath || 'package.json');
     toast('GitHub plugin installed');
   });
 
   $('#installSelectedGithubPlugin').addEventListener('click', async () => {
-    await installGithubSource($('#githubResultSelect').value);
+    const selectedRepo = state.githubResults.find((r) => r.cloneUrl === $('#githubResultSelect').value);
+    const selectedPackagePath = selectedRepo?.packagePath || selectedRepo?.pluginPackages?.[0]?.packagePath || 'package.json';
+    await installGithubSource($('#githubResultSelect').value, selectedPackagePath);
     toast('Selected GitHub plugin installed');
   });
 

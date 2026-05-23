@@ -58,6 +58,8 @@ class CommandManager {
     this.aliases = new Map();
     this.cooldowns = new Map();
     this.listenersAttached = false;
+    this.pendingSyncTimer = null;
+    this.groupedSlashRoutes = new Map();
   }
 
   attachClientListeners() {
@@ -92,6 +94,7 @@ class CommandManager {
       this.registerCommand(pluginId, command);
     }
     this.logger.info('Registered plugin commands', { pluginId, count: commands.length });
+    this.scheduleSlashSync('plugin command registration');
   }
 
   unregisterPluginCommands(pluginId) {
@@ -106,6 +109,8 @@ class CommandManager {
         this.aliases.delete(alias);
       }
     }
+
+    this.scheduleSlashSync('plugin command unregistration');
   }
 
   listCommands() {
@@ -123,25 +128,72 @@ class CommandManager {
     return this.commands.get(name) || this.commands.get(this.aliases.get(name));
   }
 
+  commandMode() {
+    return this.configManager.getCore('commands.mode', 'both');
+  }
+
+  scheduleSlashSync(reason = 'runtime change') {
+    if (!this.configManager.getCore('commands.autoSyncSlash', true)) return;
+    if (this.pendingSyncTimer) clearTimeout(this.pendingSyncTimer);
+    this.pendingSyncTimer = setTimeout(async () => {
+      this.pendingSyncTimer = null;
+      try {
+        await this.syncSlashCommands();
+        this.logger.info('Auto slash sync completed', { reason });
+      } catch (error) {
+        this.logger.error('Auto slash sync failed', { reason, error });
+      }
+    }, 1200);
+  }
+
+  groupedPayloads(commandsByCategory) {
+    return Object.entries(commandsByCategory).slice(0, 100).map(([category, commands]) => ({
+      name: category.slice(0, 32),
+      description: `Commands for ${category}`.slice(0, 100),
+      options: commands.slice(0, 25).map((command) => ({
+        type: ApplicationCommandOptionType.Subcommand,
+        name: command.name,
+        description: (command.description || command.name).slice(0, 100)
+      }))
+    }));
+  }
+
   slashPayloads() {
-    return Array.from(this.commands.values())
-      .filter((command) => command.slash !== false)
-      .map((command) => {
-        if (command.slashCommand?.toJSON) return command.slashCommand.toJSON();
-        if (command.slashCommand && typeof command.slashCommand === 'object') return command.slashCommand;
+    this.groupedSlashRoutes.clear();
+    const slashCommands = Array.from(this.commands.values()).filter((command) => command.slash !== false);
+    const directPayloads = slashCommands.map((command) => {
+      if (command.slashCommand?.toJSON) return command.slashCommand.toJSON();
+      if (command.slashCommand && typeof command.slashCommand === 'object') return command.slashCommand;
 
-        const payload = {
-          name: command.name,
-          description: command.description || `/${command.name}`,
-          options: (command.options || []).map(normalizeOption)
-        };
+      const payload = {
+        name: command.name,
+        description: command.description || `/${command.name}`,
+        options: (command.options || []).map(normalizeOption)
+      };
 
-        if (command.defaultMemberPermissions) {
-          payload.default_member_permissions = String(resolvePermission(command.defaultMemberPermissions));
-        }
+      if (command.defaultMemberPermissions) {
+        payload.default_member_permissions = String(resolvePermission(command.defaultMemberPermissions));
+      }
 
-        return payload;
-      });
+      return payload;
+    });
+
+    if (directPayloads.length <= 100) return directPayloads;
+
+    const commandsByCategory = {};
+    for (const command of slashCommands) {
+      const category = String(command.category || command.pluginId || 'general').toLowerCase().replace(/[^a-z0-9_-]/g, '-').slice(0, 32);
+      commandsByCategory[category] ||= [];
+      commandsByCategory[category].push(command);
+      this.groupedSlashRoutes.set(`${category}:${command.name}`, command.name);
+    }
+
+    this.logger.warning('Slash command count exceeded 100; using category compression mode.', {
+      originalCount: directPayloads.length,
+      categories: Object.keys(commandsByCategory).length
+    });
+
+    return this.groupedPayloads(commandsByCategory);
   }
 
   async syncSlashCommands() {
@@ -269,6 +321,8 @@ class CommandManager {
   }
 
   async handleMessage(message) {
+    const mode = this.commandMode();
+    if (mode === 'slash') return;
     if (!this.configManager.getCore('commands.allowPrefixCommands', true)) return;
     if (!message.guild || message.author?.bot) return;
 
@@ -305,8 +359,17 @@ class CommandManager {
 
   async handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
+    const mode = this.commandMode();
+    if (mode === 'prefix') return;
 
-    const command = this.resolveCommand(interaction.commandName);
+    let command = this.resolveCommand(interaction.commandName);
+    if (!command && interaction.options?.getSubcommand) {
+      const subcommand = interaction.options.getSubcommand(false);
+      if (subcommand) {
+        const mappedName = this.groupedSlashRoutes.get(`${interaction.commandName}:${subcommand}`);
+        if (mappedName) command = this.resolveCommand(mappedName);
+      }
+    }
     if (!command || command.slash === false) return;
 
     const options = this.slashOptions(interaction);
