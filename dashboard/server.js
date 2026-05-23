@@ -1,3 +1,4 @@
+require('dotenv').config({ quiet: true });
 const path = require('node:path');
 const http = require('node:http');
 const crypto = require('node:crypto');
@@ -437,7 +438,7 @@ class DashboardServer {
     this.rootLogger.on('entry', this.logListener);
 
     const host = this.config('host', '0.0.0.0');
-    const port = this.config('port', 3000);
+    const port = this.config('port', process.env.PORT || 3000);
 
     await new Promise((resolve) => {
       this.server.listen(port, host, resolve);

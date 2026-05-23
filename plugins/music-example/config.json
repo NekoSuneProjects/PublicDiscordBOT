@@ -1,6 +1,0 @@
-{
-  "maxQueueSize": 50,
-  "volume": 0.65,
-  "leaveOnStop": true,
-  "leaveOnQueueEnd": true
-}
