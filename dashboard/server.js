@@ -242,7 +242,8 @@ class DashboardServer {
       try {
         const source = String(req.body.source || '').trim();
         if (!source) return res.status(400).json({ error: 'source is required' });
-        const plugin = await this.pluginManager.installFromSource(source);
+        const packagePath = req.body.packagePath ? String(req.body.packagePath).trim() : null;
+        const plugin = await this.pluginManager.installFromSource(source, { packagePath });
         res.json({ plugin });
       } catch (error) {
         next(error);
@@ -273,7 +274,11 @@ class DashboardServer {
           ...result,
           repositories: result.repositories.map((repository) => ({
             ...repository,
-            installed: installedSources.has(repository.cloneUrl) || installedIds.has(repository.pluginId) || installedIds.has(repository.name)
+            installed: installedSources.has(repository.cloneUrl) || installedIds.has(repository.pluginId) || installedIds.has(repository.name),
+            pluginPackages: (repository.pluginPackages || []).map((pkg) => ({
+              ...pkg,
+              installed: installedIds.has(pkg.pluginId)
+            }))
           }))
         });
       } catch (error) {

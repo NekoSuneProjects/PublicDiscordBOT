@@ -106,6 +106,7 @@ function renderPlugins() {
 
     const row = document.createElement('div');
     row.className = 'plugin-row';
+    const packageLines = (repository.pluginPackages || []).map((pkg) => `<div class="plugin-meta">- ${escapeHtml(pkg.pluginId)} (${escapeHtml(pkg.packagePath)}) ${pkg.installed ? '<span class="badge ok">installed</span>' : ''}</div>`).join('');
     row.innerHTML = `
       <div>
         <div class="plugin-title"><strong>${escapeHtml(plugin.name || plugin.id)}</strong><span class="badge">${escapeHtml(plugin.id)}</span>${pluginBadge(plugin)}</div>
@@ -140,6 +141,7 @@ function renderCommands() {
   for (const command of state.commands) {
     const row = document.createElement('div');
     row.className = 'plugin-row';
+    const packageLines = (repository.pluginPackages || []).map((pkg) => `<div class="plugin-meta">- ${escapeHtml(pkg.pluginId)} (${escapeHtml(pkg.packagePath)}) ${pkg.installed ? '<span class="badge ok">installed</span>' : ''}</div>`).join('');
     row.innerHTML = `
       <div>
         <div class="plugin-title"><strong>${escapeHtml(command.name)}</strong><span class="badge">${escapeHtml(command.pluginId)}</span></div>
@@ -182,6 +184,7 @@ function renderGithubResults() {
     const topics = (repository.topics || []).slice(0, 6)
       .map((topic) => `<span class="badge">${escapeHtml(topic)}</span>`)
       .join('');
+    const packageLines = (repository.pluginPackages || []).map((pkg) => `<div class="plugin-meta">- ${escapeHtml(pkg.pluginId)} (${escapeHtml(pkg.packagePath)}) ${pkg.installed ? '<span class="badge ok">installed</span>' : ''}</div>`).join('');
     row.innerHTML = `
       <div>
         <div class="plugin-title">
@@ -194,10 +197,13 @@ function renderGithubResults() {
         <div class="plugin-meta">Author: ${escapeHtml(repository.author || repository.owner || 'unknown')}</div>
         <div class="plugin-meta">${escapeHtml(repository.fullName)} - ${escapeHtml(repository.language || 'Unknown')} - ${repository.stars} stars - ${repository.forks} forks</div>
         ${repository.packageError ? `<div class="plugin-meta level-error">${escapeHtml(repository.packageError)}</div>` : ''}
+        ${packageLines}
         <div class="plugin-title">${topics}</div>
       </div>
       <div class="plugin-actions">
-        <button class="button primary" data-install-github="${escapeHtml(repository.cloneUrl)}" ${repository.installed || repository.packageReadable === false ? 'disabled' : ''}>Install</button>
+        ${(repository.pluginPackages && repository.pluginPackages.length > 1)
+          ? repository.pluginPackages.map((pkg) => `<button class="button primary" data-install-github="${escapeHtml(repository.cloneUrl)}" data-package-path="${escapeHtml(pkg.packagePath)}" ${pkg.installed || repository.packageReadable === false ? 'disabled' : ''}>Install ${escapeHtml(pkg.pluginId)}</button>`).join('')
+          : `<button class="button primary" data-install-github="${escapeHtml(repository.cloneUrl)}" data-package-path="${escapeHtml(repository.packagePath || 'package.json')}" ${repository.installed || repository.packageReadable === false ? 'disabled' : ''}>Install</button>`}
       </div>
     `;
     list.appendChild(row);
@@ -343,12 +349,14 @@ function bindActions() {
     const button = event.target.closest('button[data-install-github]');
     if (!button) return;
 
-    await installGithubSource(button.dataset.installGithub);
+    await installGithubSource(button.dataset.installGithub, button.dataset.packagePath || 'package.json');
     toast('GitHub plugin installed');
   });
 
   $('#installSelectedGithubPlugin').addEventListener('click', async () => {
-    await installGithubSource($('#githubResultSelect').value);
+    const selectedRepo = state.githubResults.find((r) => r.cloneUrl === $('#githubResultSelect').value);
+    const selectedPackagePath = selectedRepo?.packagePath || selectedRepo?.pluginPackages?.[0]?.packagePath || 'package.json';
+    await installGithubSource($('#githubResultSelect').value, selectedPackagePath);
     toast('Selected GitHub plugin installed');
   });
 

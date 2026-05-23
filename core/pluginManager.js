@@ -491,9 +491,10 @@ class PluginManager {
     return true;
   }
 
-  async installFromSource(source) {
+  async installFromSource(source, options = {}) {
     const securityConfig = this.configManager.getCore('security', {});
     const result = await installPluginFromSource(source, {
+      packagePath: options.packagePath || null,
       pluginsDirectory: this.pluginsDirectory(),
       allowedHosts: securityConfig.allowedPluginHosts || [],
       allowRemoteInstall: securityConfig.allowRemotePluginInstall !== false,
@@ -624,6 +625,7 @@ class PluginManager {
 
     const securityConfig = this.configManager.getCore('security', {});
     const result = await installPluginFromSource(source, {
+      packagePath: options.packagePath || null,
       pluginsDirectory: this.pluginsDirectory(),
       allowedHosts: securityConfig.allowedPluginHosts || [],
       allowRemoteInstall: securityConfig.allowRemotePluginInstall !== false,

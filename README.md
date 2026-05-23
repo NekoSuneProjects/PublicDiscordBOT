@@ -12,6 +12,7 @@ Production-grade Discord.js v14 bot scaffold with dynamic plugins, plugin-local 
 - Express dashboard with Discord OAuth2 login, plugin controls, JSON config editors, command testing, and live logs
 - GitHub plugin discovery by repository topic, defaulting to `nekosunebot-package`
 - GitHub update checks for installed plugins, including remote version and pushed date comparison
+- GitHub discovery supports multi-plugin repositories (root or folder-based package.json) and lets you install a specific plugin package path
 - Config hot reload from `config/core.json` and `config/plugins/*.json`
 - Graceful shutdown and watchdog restart flow
 - Bundled examples for command, utility/automod/XP, and music playback
