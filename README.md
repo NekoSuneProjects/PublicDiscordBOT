@@ -42,8 +42,10 @@ DASHBOARD_SESSION_SECRET=replace-with-a-long-random-string
 GITHUB_TOKEN=optional-token-for-higher-github-search-rate-limits
 ```
 
-Edit `config/core.json`:
+Edit `config/core.json` for non-sensitive defaults, and use `.env` for runtime secrets/overrides.
 
+- `commands.mode`: `both`, `slash`, or `prefix`
+- `commands.autoSyncSlash`: auto sync slash commands whenever plugins/config change
 - `discord.ownerIds`: Discord user IDs allowed to run owner-only bot commands
 - `dashboard.adminUserIds`: Discord user IDs allowed into the dashboard
 - `commands.guildIds`: guild IDs for fast guild slash command registration
@@ -68,6 +70,15 @@ npm run register:commands
 ```
 
 For automatic slash command registration on startup, set `commands.registerOnReady` to `true`.
+
+
+### Slash command behavior
+
+- Slash commands are supported for all commands with `slash !== false`.
+- Prefix commands are supported for all commands with `prefix !== false`.
+- Runtime toggle via `commands.mode` (or `COMMANDS_MODE`) lets you use only slash, only prefix, or both.
+- Commands auto-sync on plugin load/unload and core config updates when `commands.autoSyncSlash` is enabled.
+- If slash commands exceed Discord's 100-command limit, commands are automatically compressed into category-based slash groups to stay deployable.
 
 ## Watchdog Restart
 
@@ -322,3 +333,19 @@ npm run check
 ## Notes
 
 Plugins are Node.js code. The system isolates failures and plugin dependencies, but in-process JavaScript is not a hard security sandbox. Install only trusted plugins in production.
+
+## Docker
+
+Build locally:
+
+```bash
+docker build -t publicdiscordbot .
+```
+
+Run with env file:
+
+```bash
+docker run --env-file .env -p 3000:3000 publicdiscordbot
+```
+
+A GitHub Actions workflow is included at `.github/workflows/docker-image.yml` to validate Docker image builds on pushes and pull requests.
