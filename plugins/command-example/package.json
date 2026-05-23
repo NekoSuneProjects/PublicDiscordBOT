@@ -1,0 +1,17 @@
+{
+  "name": "command-example",
+  "version": "1.0.0",
+  "description": "Example command plugin with prefix, slash, permissions, and dashboard component support.",
+  "main": "index.js",
+  "modularDiscordBotPlugin": {
+    "id": "command-example",
+    "name": "Command Example",
+    "version": "1.0.0",
+    "entry": "index.js",
+    "defaultEnabled": true,
+    "permissions": [
+      "discord.commands",
+      "dashboard.components"
+    ]
+  }
+}

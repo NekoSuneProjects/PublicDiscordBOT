@@ -1,0 +1,34 @@
+{
+  "plugins": {
+    "command-example": {
+      "enabled": true,
+      "name": "Command Example",
+      "version": "1.0.0",
+      "source": "local",
+      "path": "plugins\\command-example",
+      "requiresRestart": false,
+      "status": "loaded",
+      "lastError": null,
+      "loadedAt": "2026-05-23T08:18:50.087Z"
+    },
+    "utility-example": {
+      "enabled": true,
+      "name": "Utility Example",
+      "version": "1.0.0",
+      "source": "local",
+      "path": "plugins\\utility-example",
+      "requiresRestart": false,
+      "status": "loaded",
+      "lastError": null,
+      "loadedAt": "2026-05-23T08:18:50.713Z"
+    },
+    "music-example": {
+      "enabled": false,
+      "name": "Music Example",
+      "version": "1.0.0",
+      "source": "local",
+      "path": "plugins\\music-example",
+      "requiresRestart": false
+    }
+  }
+}

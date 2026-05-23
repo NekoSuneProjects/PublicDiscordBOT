@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ModularDiscordBot Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">M</span>
+        <div>
+          <strong>ModularDiscordBot</strong>
+          <small id="connectionState">Loading</small>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="Dashboard sections">
+        <button class="tab active" data-view="overview">Overview</button>
+        <button class="tab" data-view="plugins">Plugins</button>
+        <button class="tab" data-view="settings">Settings</button>
+        <button class="tab" data-view="commands">Commands</button>
+        <button class="tab" data-view="logs">Logs</button>
+      </nav>
+      <button id="logoutButton" class="button subtle">Sign out</button>
+    </aside>
+
+    <main class="workspace">
+      <section class="topbar">
+        <div>
+          <h1 id="viewTitle">Overview</h1>
+          <p id="userLabel"></p>
+        </div>
+        <button id="refreshButton" class="button">Refresh</button>
+      </section>
+
+      <section id="overview" class="view active">
+        <div class="metrics">
+          <div class="metric"><span>Discord</span><strong id="botReady">-</strong></div>
+          <div class="metric"><span>Guilds</span><strong id="guildCount">-</strong></div>
+          <div class="metric"><span>Latency</span><strong id="ping">-</strong></div>
+          <div class="metric"><span>Uptime</span><strong id="uptime">-</strong></div>
+        </div>
+        <div class="panel">
+          <h2>Installed Plugins</h2>
+          <div id="overviewPlugins" class="compact-list"></div>
+        </div>
+      </section>
+
+      <section id="plugins" class="view">
+        <div class="panel split">
+          <form id="installForm" class="inline-form">
+            <label for="pluginSource">Install Source</label>
+            <input id="pluginSource" name="source" type="url" placeholder="https://github.com/org/plugin.git" required>
+            <button class="button primary" type="submit">Install</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Plugins</h2>
+          <div id="pluginList" class="plugin-list"></div>
+        </div>
+        <div class="panel">
+          <h2>Plugin Config</h2>
+          <div class="editor-toolbar">
+            <select id="pluginConfigSelect"></select>
+            <button id="loadPluginConfig" class="button">Load</button>
+            <button id="savePluginConfig" class="button primary">Save</button>
+          </div>
+          <textarea id="pluginConfigEditor" spellcheck="false"></textarea>
+          <div id="pluginComponent" class="plugin-component"></div>
+        </div>
+      </section>
+
+      <section id="settings" class="view">
+        <div class="panel">
+          <div class="editor-toolbar">
+            <h2>Core Settings</h2>
+            <button id="saveCoreSettings" class="button primary">Save</button>
+          </div>
+          <textarea id="coreSettingsEditor" spellcheck="false"></textarea>
+        </div>
+      </section>
+
+      <section id="commands" class="view">
+        <div class="panel">
+          <h2>Registered Commands</h2>
+          <div id="commandList" class="compact-list"></div>
+        </div>
+        <div class="panel">
+          <form id="commandTestForm" class="inline-form">
+            <label for="commandInput">Test Command</label>
+            <input id="commandInput" name="command" type="text" placeholder="plugins" required>
+            <button class="button primary" type="submit">Run</button>
+          </form>
+          <pre id="commandOutput" class="output"></pre>
+        </div>
+      </section>
+
+      <section id="logs" class="view">
+        <div class="panel">
+          <div class="editor-toolbar">
+            <h2>Live Logs</h2>
+            <button id="clearLogs" class="button">Clear</button>
+          </div>
+          <div id="logStream" class="log-stream"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

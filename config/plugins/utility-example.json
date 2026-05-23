@@ -1,0 +1,16 @@
+{
+  "automod": {
+    "enabled": true,
+    "blockedWords": [
+      "badword"
+    ],
+    "deleteMessage": true,
+    "warnMessage": "That message was blocked by auto-moderation."
+  },
+  "xp": {
+    "enabled": true,
+    "minPerMessage": 5,
+    "maxPerMessage": 14,
+    "cooldownMs": 60000
+  }
+}
