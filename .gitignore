@@ -6,3 +6,4 @@ data/
 tmp/
 npm-debug.log*
 config/
+plugins/
