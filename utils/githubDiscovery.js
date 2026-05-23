@@ -147,6 +147,38 @@ async function findRemotePackage(owner, repo, ref) {
   throw new Error(`No plugin package.json found in ${owner}/${repo}.`);
 }
 
+async function findRemotePluginPackages(owner, repo, ref) {
+  const params = new URLSearchParams({ ref });
+  const rootEntries = await githubJson(`https://api.github.com/repos/${owner}/${repo}/contents?${params.toString()}`);
+  const packagePaths = ['package.json'];
+
+  const directories = Array.isArray(rootEntries)
+    ? rootEntries.filter((entry) => entry.type === 'dir').slice(0, 50)
+    : [];
+
+  for (const directory of directories) {
+    packagePaths.push(`${directory.name}/package.json`);
+  }
+
+  const plugins = [];
+  for (const packagePath of packagePaths) {
+    try {
+      const pkg = await fetchPackageJsonAt(owner, repo, packagePath, ref);
+      const manifest = pluginManifestFromPackage(pkg, {
+        owner,
+        htmlUrl: githubHtmlUrl(owner, repo)
+      });
+      if (manifest.id) {
+        plugins.push({ packagePath, package: pkg, manifest });
+      }
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
+  }
+
+  return plugins;
+}
+
 function packageAuthor(author, fallback) {
   if (!author) return fallback;
   if (typeof author === 'string') return author;
@@ -222,6 +254,19 @@ async function getGithubRemotePluginInfo(source) {
   };
 }
 
+async function listGithubRemotePlugins(source) {
+  const repository = await getGithubRepositoryInfo(source);
+  if (!repository) {
+    throw new Error('Plugin source is not a GitHub repository URL.');
+  }
+
+  const plugins = await findRemotePluginPackages(repository.owner, repository.repo, repository.defaultBranch);
+  return {
+    repository,
+    plugins
+  };
+}
+
 function buildRepositorySearchQuery({ topic, query }) {
   const parts = [
     `topic:${normalizeTopic(topic)}`,
@@ -259,20 +304,28 @@ function mapRepository(item) {
 
 async function enrichRepository(repository) {
   try {
-    const remote = await getGithubRemotePluginInfo(repository.cloneUrl);
+    const remoteList = await listGithubRemotePlugins(repository.cloneUrl);
+    const primary = remoteList.plugins[0];
     return {
       ...repository,
-      pluginId: remote.manifest.id,
-      pluginName: remote.manifest.name,
-      pluginVersion: remote.manifest.version,
-      pluginDescription: remote.manifest.description || repository.description,
-      author: remote.manifest.author || repository.author,
-      homepage: remote.manifest.homepage,
-      repository: remote.manifest.repository,
-      githubUrl: remote.manifest.githubUrl || repository.githubUrl,
-      packagePath: remote.packagePath,
-      permissions: remote.manifest.permissions,
-      requiresRestart: remote.manifest.requiresRestart,
+      pluginId: primary?.manifest.id,
+      pluginName: primary?.manifest.name,
+      pluginVersion: primary?.manifest.version,
+      pluginDescription: primary?.manifest.description || repository.description,
+      author: primary?.manifest.author || repository.author,
+      homepage: primary?.manifest.homepage,
+      repository: primary?.manifest.repository,
+      githubUrl: primary?.manifest.githubUrl || repository.githubUrl,
+      packagePath: primary?.packagePath,
+      permissions: primary?.manifest.permissions,
+      requiresRestart: primary?.manifest.requiresRestart,
+      pluginPackages: remoteList.plugins.map((entry) => ({
+        pluginId: entry.manifest.id,
+        pluginName: entry.manifest.name,
+        pluginVersion: entry.manifest.version,
+        pluginDescription: entry.manifest.description,
+        packagePath: entry.packagePath
+      })),
       packageReadable: true
     };
   } catch (error) {
@@ -327,5 +380,6 @@ module.exports = {
   parseGithubRepositoryUrl,
   getGithubRepositoryInfo,
   getGithubRemotePluginInfo,
+  listGithubRemotePlugins,
   searchGithubPluginRepositories
 };

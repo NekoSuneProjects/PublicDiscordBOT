@@ -86,7 +86,10 @@ async function main() {
   client.on('shardResume', (shardId, replayedEvents) => logger.info('Discord shard resumed', { shardId, replayedEvents }));
 
   configManager.on('coreChanged', () => {
-    if (client.isReady()) applyPresence(client, configManager, logger);
+    if (client.isReady()) {
+      applyPresence(client, configManager, logger);
+      commandManager.scheduleSlashSync('core configuration changed');
+    }
   });
 
   configManager.on('error', (error) => logger.error('Configuration watcher error', { error }));

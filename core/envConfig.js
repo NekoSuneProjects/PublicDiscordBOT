@@ -35,12 +35,14 @@ function applyEnvOverrides(core = {}, env = process.env) {
 
   if (env.BOT_PREFIX) next.bot = { ...(next.bot || {}), prefix: env.BOT_PREFIX };
 
+  if (env.COMMANDS_MODE) next.commands.mode = env.COMMANDS_MODE;
   if (env.COMMANDS_SLASH_REGISTRATION) next.commands.slashRegistration = env.COMMANDS_SLASH_REGISTRATION;
   const guildIds = toCsv(env.COMMANDS_GUILD_IDS);
   if (guildIds.length) next.commands.guildIds = guildIds;
   next.commands.registerOnReady = toBool(env.COMMANDS_REGISTER_ON_READY, next.commands.registerOnReady);
   next.commands.allowPrefixCommands = toBool(env.COMMANDS_ALLOW_PREFIX, next.commands.allowPrefixCommands);
   next.commands.allowDashboardTesting = toBool(env.COMMANDS_ALLOW_DASHBOARD_TESTING, next.commands.allowDashboardTesting);
+  next.commands.autoSyncSlash = toBool(env.COMMANDS_AUTO_SYNC_SLASH, next.commands.autoSyncSlash);
 
   next.dashboard.enabled = toBool(env.DASHBOARD_ENABLED, next.dashboard.enabled);
   if (env.DASHBOARD_HOST) next.dashboard.host = env.DASHBOARD_HOST;

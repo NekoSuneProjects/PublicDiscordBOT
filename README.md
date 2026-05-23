@@ -12,6 +12,7 @@ Production-grade Discord.js v14 bot scaffold with dynamic plugins, plugin-local 
 - Express dashboard with Discord OAuth2 login, plugin controls, JSON config editors, command testing, and live logs
 - GitHub plugin discovery by repository topic, defaulting to `nekosunebot-package`
 - GitHub update checks for installed plugins, including remote version and pushed date comparison
+- GitHub discovery supports multi-plugin repositories (root or folder-based package.json) and lets you install a specific plugin package path
 - Config hot reload from `config/core.json` and `config/plugins/*.json`
 - Graceful shutdown and watchdog restart flow
 - Bundled examples for command, utility/automod/XP, and music playback
@@ -42,8 +43,10 @@ DASHBOARD_SESSION_SECRET=replace-with-a-long-random-string
 GITHUB_TOKEN=optional-token-for-higher-github-search-rate-limits
 ```
 
-Edit `config/core.json`:
+Edit `config/core.json` for non-sensitive defaults, and use `.env` for runtime secrets/overrides.
 
+- `commands.mode`: `both`, `slash`, or `prefix`
+- `commands.autoSyncSlash`: auto sync slash commands whenever plugins/config change
 - `discord.ownerIds`: Discord user IDs allowed to run owner-only bot commands
 - `dashboard.adminUserIds`: Discord user IDs allowed into the dashboard
 - `commands.guildIds`: guild IDs for fast guild slash command registration
@@ -68,6 +71,15 @@ npm run register:commands
 ```
 
 For automatic slash command registration on startup, set `commands.registerOnReady` to `true`.
+
+
+### Slash command behavior
+
+- Slash commands are supported for all commands with `slash !== false`.
+- Prefix commands are supported for all commands with `prefix !== false`.
+- Runtime toggle via `commands.mode` (or `COMMANDS_MODE`) lets you use only slash, only prefix, or both.
+- Commands auto-sync on plugin load/unload and core config updates when `commands.autoSyncSlash` is enabled.
+- If slash commands exceed Discord's 100-command limit, commands are automatically compressed into category-based slash groups to stay deployable.
 
 ## Watchdog Restart
 
