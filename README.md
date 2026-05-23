@@ -322,3 +322,19 @@ npm run check
 ## Notes
 
 Plugins are Node.js code. The system isolates failures and plugin dependencies, but in-process JavaScript is not a hard security sandbox. Install only trusted plugins in production.
+
+## Docker
+
+Build locally:
+
+```bash
+docker build -t publicdiscordbot .
+```
+
+Run with env file:
+
+```bash
+docker run --env-file .env -p 3000:3000 publicdiscordbot
+```
+
+A GitHub Actions workflow is included at `.github/workflows/docker-image.yml` to validate Docker image builds on pushes and pull requests.
