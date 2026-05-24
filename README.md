@@ -218,7 +218,7 @@ Manifest permissions `voice` and `network` are advisory. The host logs an error 
 
 ## Plugin Dependencies
 
-When a plugin is loaded, the manager reads the plugin's `dependencies` and runs:
+When a plugin is loaded or updated from GitHub, the manager reads the plugin's `dependencies` and runs:
 
 ```text
 npm install --no-audit --no-fund --omit=dev --ignore-scripts

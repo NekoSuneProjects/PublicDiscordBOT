@@ -67,9 +67,13 @@ async function installPluginDependencies(pluginPath, options = {}, logger) {
   if (!dependencies.length) return { installed: false, reason: 'no dependencies' };
 
   const missing = [];
-  for (const dependency of dependencies) {
-    if (!(await dependencyIsInstalled(pluginPath, dependency))) {
-      missing.push(dependency);
+  if (options.force === true) {
+    missing.push(...dependencies);
+  } else {
+    for (const dependency of dependencies) {
+      if (!(await dependencyIsInstalled(pluginPath, dependency))) {
+        missing.push(dependency);
+      }
     }
   }
 
@@ -78,6 +82,7 @@ async function installPluginDependencies(pluginPath, options = {}, logger) {
   logger?.info('Installing plugin dependencies', {
     pluginPath,
     dependencies: missing,
+    force: options.force === true,
     ignoreScripts: options.ignoreScripts !== false
   });
 

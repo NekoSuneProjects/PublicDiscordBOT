@@ -9,6 +9,7 @@ const {
 } = require('../utils/pluginInstaller');
 const {
   getGithubRemotePluginInfo,
+  listGithubRemotePlugins,
   parseGithubRepositoryUrl
 } = require('../utils/githubDiscovery');
 
@@ -70,6 +71,15 @@ function remoteRegistryFields(remote) {
     author: remote.manifest.author || remote.repository.owner,
     remoteDescription: remote.manifest.description || remote.repository.description
   };
+}
+
+function uniqueValues(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function githubSourceFromState(state = {}) {
+  return [state.source, state.githubUrl, state.repository]
+    .find((source) => parseGithubRepositoryUrl(source));
 }
 
 class PluginManager {
@@ -199,6 +209,44 @@ class PluginManager {
         requiredConfig: 'discord.intents includes "GuildVoiceStates"'
       });
     }
+  }
+
+  async resolveGithubPluginInfo(pluginId, state) {
+    const source = githubSourceFromState(state);
+    if (!source) {
+      throw new Error(`Plugin "${pluginId}" was not installed from a GitHub source.`);
+    }
+
+    const packagePaths = uniqueValues([
+      state.packagePath,
+      state.latestPackagePath
+    ]);
+    const failures = [];
+
+    for (const packagePath of packagePaths) {
+      try {
+        const remote = await getGithubRemotePluginInfo(source, packagePath);
+        if (remote.manifest.id === pluginId) return { ...remote, source };
+        failures.push(`${packagePath}: found plugin "${remote.manifest.id}"`);
+      } catch (error) {
+        failures.push(`${packagePath}: ${error.message}`);
+      }
+    }
+
+    const remoteList = await listGithubRemotePlugins(source);
+    const match = remoteList.plugins.find((entry) => entry.manifest.id === pluginId);
+    if (!match) {
+      const searched = failures.length ? ` Checked ${failures.join('; ')}.` : '';
+      throw new Error(`No package for plugin "${pluginId}" was found in ${remoteList.repository.fullName}.${searched}`);
+    }
+
+    return {
+      source,
+      repository: remoteList.repository,
+      packagePath: match.packagePath,
+      package: match.package,
+      manifest: match.manifest
+    };
   }
 
   createTrackedClient(pluginId, manifest, eventListeners) {
@@ -533,7 +581,7 @@ class PluginManager {
       logger: this.logger
     });
 
-    const packagePath = options.packagePath || 'package.json';
+    const packagePath = result.packagePath || options.packagePath || 'package.json';
     const remote = parseGithubRepositoryUrl(source)
       ? await getGithubRemotePluginInfo(source, packagePath).catch((error) => {
         this.logger.warning('Unable to read GitHub plugin metadata after install', { source, error });
@@ -552,7 +600,7 @@ class PluginManager {
       homepage: result.manifest.homepage || remote?.manifest.homepage,
       repository: result.manifest.repository || remote?.manifest.repository,
       githubUrl: result.manifest.githubUrl || remote?.manifest.githubUrl,
-      sourceType: remote ? 'github' : 'remote',
+      sourceType: parseGithubRepositoryUrl(source) ? 'github' : 'remote',
       packagePath,
       sourcePushedAt: remote?.repository.pushedAt,
       updateAvailable: false,
@@ -575,8 +623,8 @@ class PluginManager {
     const state = this.configManager.getPluginState(pluginId);
     if (!discovered || !state) throw new Error(`Plugin "${pluginId}" is not installed.`);
 
-    const source = state.source;
-    if (!source || source === 'local' || !parseGithubRepositoryUrl(source)) {
+    const source = githubSourceFromState(state);
+    if (!source || source === 'local') {
       const result = {
         id: pluginId,
         updateAvailable: false,
@@ -592,14 +640,19 @@ class PluginManager {
     }
 
     const { manifest: localManifest } = await validatePluginDirectory(discovered.path);
-    const remote = await getGithubRemotePluginInfo(source, state.packagePath || state.latestPackagePath || 'package.json');
+    const remote = await this.resolveGithubPluginInfo(pluginId, state);
     const remoteVersionNewer = compareVersions(remote.manifest.version, localManifest.version) > 0;
-    const sourceChanged = isNewerDate(remote.repository.pushedAt, state.sourcePushedAt);
+    const sourceChanged = state.sourcePushedAt
+      ? isNewerDate(remote.repository.pushedAt, state.sourcePushedAt)
+      : false;
     const updateAvailable = remoteVersionNewer || sourceChanged;
     const updateReason = remoteVersionNewer ? 'version' : (sourceChanged ? 'source-pushed' : 'current');
 
     const updateState = {
       ...remoteRegistryFields(remote),
+      source,
+      sourceType: 'github',
+      packagePath: remote.packagePath,
       latestCheckedAt: new Date().toISOString(),
       updateAvailable,
       updateReason
@@ -615,6 +668,7 @@ class PluginManager {
       latestPushedAt: remote.repository.pushedAt,
       updateAvailable,
       updateReason,
+      packagePath: remote.packagePath,
       repository: remote.repository,
       manifest: remote.manifest
     };
@@ -624,7 +678,7 @@ class PluginManager {
     const results = [];
     await this.discoverPlugins();
     for (const plugin of this.listPlugins()) {
-      if (!plugin.source || plugin.source === 'local' || !parseGithubRepositoryUrl(plugin.source)) continue;
+      if (!plugin.updateSupported) continue;
       try {
         results.push(await this.checkPluginUpdate(plugin.id));
       } catch (error) {
@@ -646,19 +700,20 @@ class PluginManager {
     const state = this.configManager.getPluginState(pluginId);
     if (!discovered || !state) throw new Error(`Plugin "${pluginId}" is not installed.`);
 
-    const source = state.source;
-    if (!source || source === 'local' || !parseGithubRepositoryUrl(source)) {
+    const source = githubSourceFromState(state);
+    if (!source || source === 'local') {
       throw new Error(`Plugin "${pluginId}" was not installed from a GitHub source and cannot be updated automatically.`);
     }
 
     const wasEnabled = state.enabled !== false;
     const previousVersion = state.version;
+    const { manifest: localManifest } = await validatePluginDirectory(discovered.path);
+    const remote = await this.resolveGithubPluginInfo(pluginId, state);
     await this.unloadPlugin(pluginId);
 
     const securityConfig = this.configManager.getCore('security', {});
-    const packagePath = state.packagePath || state.latestPackagePath || 'package.json';
     const result = await installPluginFromSource(source, {
-      packagePath,
+      packagePath: remote.packagePath,
       pluginsDirectory: this.pluginsDirectory(),
       allowedHosts: securityConfig.allowedPluginHosts || [],
       allowRemoteInstall: securityConfig.allowRemotePluginInstall !== false,
@@ -668,20 +723,27 @@ class PluginManager {
       expectedPluginId: pluginId,
       logger: this.logger
     });
-    const remote = await getGithubRemotePluginInfo(source, packagePath).catch((error) => {
-      this.logger.warning('Unable to read GitHub plugin metadata after update', { pluginId, source, error });
-      return null;
-    });
+    let dependencyInstall = null;
+    if (this.configManager.getCore('plugins.installDependencies', true)) {
+      dependencyInstall = await installPluginDependencies(
+        result.destination,
+        {
+          ...this.configManager.getCore('plugins.dependencyInstall', {}),
+          force: true
+        },
+        this.logger.child(pluginId)
+      );
+    }
 
     await this.discoverPlugins();
     await this.configManager.setPluginState(pluginId, {
       enabled: wasEnabled,
       source,
       sourceType: 'github',
-      packagePath,
+      packagePath: result.packagePath || remote.packagePath,
       name: result.manifest.name,
       version: result.manifest.version,
-      previousVersion,
+      previousVersion: localManifest.version || previousVersion,
       description: result.manifest.description,
       author: result.manifest.author || remote?.manifest.author,
       homepage: result.manifest.homepage || remote?.manifest.homepage,
@@ -692,6 +754,7 @@ class PluginManager {
       updateReason: 'updated',
       latestCheckedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      dependencyInstall,
       status: wasEnabled ? 'installed' : 'disabled',
       lastError: null,
       ...remoteRegistryFields(remote)
@@ -729,6 +792,7 @@ class PluginManager {
       const discovered = this.discovered.get(pluginId);
       const loaded = this.loaded.get(pluginId);
       const manifest = loaded?.manifest || discovered?.manifest || {};
+      const updateSupported = Boolean(githubSourceFromState(state));
       return {
         id: pluginId,
         name: manifest.name || state.name || pluginId,
@@ -754,6 +818,7 @@ class PluginManager {
         latestCheckedAt: state.latestCheckedAt,
         updateAvailable: state.updateAvailable === true,
         updateReason: state.updateReason,
+        updateSupported,
         updatedAt: state.updatedAt,
         path: state.path || (discovered?.path ? path.relative(this.rootDir, discovered.path) : undefined)
       };

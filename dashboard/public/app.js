@@ -62,7 +62,10 @@ function formatDuration(ms) {
 }
 
 function isGithubBacked(plugin) {
-  return plugin.sourceType === 'github' || Boolean(plugin.githubUrl);
+  return plugin.updateSupported === true ||
+    plugin.sourceType === 'github' ||
+    Boolean(plugin.githubUrl) ||
+    /github\.com/i.test(plugin.source || '');
 }
 
 function pluginBadge(plugin) {
@@ -269,11 +272,11 @@ async function searchGithubPlugins() {
   renderGithubResults();
 }
 
-async function installGithubSource(source) {
+async function installGithubSource(source, packagePath = null) {
   if (!source) throw new Error('Select a GitHub plugin first.');
   await api('/api/plugins/install', {
     method: 'POST',
-    body: JSON.stringify({ source })
+    body: JSON.stringify({ source, packagePath })
   });
   await Promise.all([loadPlugins(), searchGithubPlugins()]);
 }

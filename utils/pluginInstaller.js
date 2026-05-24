@@ -85,6 +85,11 @@ function isLikelyGitSource(sourceUrl) {
   return sourceUrl.endsWith('.git') || sourceUrl.includes('github.com/');
 }
 
+function startsWithPath(candidate, parent) {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 function runGitClone(sourceUrl, destination) {
   return new Promise((resolve, reject) => {
     const gitCommand = process.platform === 'win32' ? 'git.exe' : 'git';
@@ -141,18 +146,33 @@ async function extractZipSafely(zipPath, destination) {
 
 async function findPluginRoot(directory, packagePath) {
   if (packagePath) {
-    const explicit = path.resolve(directory, packagePath.replace(/\/package\.json$/, '').split('/').join(path.sep));
-    if (await fs.pathExists(path.join(explicit, 'package.json'))) return explicit;
+    const normalizedPackagePath = packagePath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const pluginRelativePath = normalizedPackagePath.endsWith('/package.json')
+      ? normalizedPackagePath.slice(0, -'/package.json'.length)
+      : normalizedPackagePath;
+    const root = path.resolve(directory);
+    const explicit = path.resolve(root, pluginRelativePath.split('/').join(path.sep));
+    if (!startsWithPath(explicit, root)) {
+      throw new Error(`Plugin packagePath escapes the downloaded source: ${packagePath}`);
+    }
+    if (await fs.pathExists(path.join(explicit, 'package.json'))) {
+      return {
+        pluginRoot: explicit,
+        packagePath: pluginRelativePath ? `${pluginRelativePath}/package.json` : 'package.json'
+      };
+    }
   }
 
   const directPackage = path.join(directory, 'package.json');
-  if (await fs.pathExists(directPackage)) return directory;
+  if (await fs.pathExists(directPackage)) {
+    return { pluginRoot: directory, packagePath: 'package.json' };
+  }
 
   const entries = await fs.readdir(directory);
   for (const entry of entries) {
     const candidate = path.join(directory, entry);
     if ((await fs.stat(candidate)).isDirectory() && await fs.pathExists(path.join(candidate, 'package.json'))) {
-      return candidate;
+      return { pluginRoot: candidate, packagePath: `${entry}/package.json` };
     }
   }
 
@@ -201,7 +221,7 @@ async function installPluginFromSource(source, options) {
       await extractZipSafely(archivePath, sourceDirectory);
     }
 
-    const pluginRoot = await findPluginRoot(sourceDirectory, packagePath);
+    const { pluginRoot, packagePath: resolvedPackagePath } = await findPluginRoot(sourceDirectory, packagePath);
     const { manifest } = await validatePluginDirectory(pluginRoot);
     if (expectedPluginId && manifest.id !== expectedPluginId) {
       throw new Error(`Updated plugin id mismatch. Expected "${expectedPluginId}", got "${manifest.id}".`);
@@ -219,7 +239,7 @@ async function installPluginFromSource(source, options) {
       filter: (src) => !src.includes(`${path.sep}.git${path.sep}`) && !src.endsWith(`${path.sep}.git`)
     });
 
-    return { manifest, destination, source };
+    return { manifest, destination, source, packagePath: resolvedPackagePath };
   } finally {
     await fs.remove(tempRoot);
   }
