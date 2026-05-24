@@ -63,11 +63,16 @@ function runNpmInstall(pluginPath, options, logger) {
 async function installPluginDependencies(pluginPath, options = {}, logger) {
   const packagePath = path.join(pluginPath, 'package.json');
   const pkg = await fs.readJson(packagePath);
+  const pluginOptions = pkg.modularDiscordBotPlugin?.dependencyInstall || {};
+  const effectiveOptions = { ...pluginOptions, ...options };
+  if (Object.prototype.hasOwnProperty.call(pluginOptions, 'ignoreScripts')) {
+    effectiveOptions.ignoreScripts = pluginOptions.ignoreScripts;
+  }
   const dependencies = Object.keys(pkg.dependencies || {});
   if (!dependencies.length) return { installed: false, reason: 'no dependencies' };
 
   const missing = [];
-  if (options.force === true) {
+  if (effectiveOptions.force === true) {
     missing.push(...dependencies);
   } else {
     for (const dependency of dependencies) {
@@ -82,11 +87,11 @@ async function installPluginDependencies(pluginPath, options = {}, logger) {
   logger?.info('Installing plugin dependencies', {
     pluginPath,
     dependencies: missing,
-    force: options.force === true,
-    ignoreScripts: options.ignoreScripts !== false
+    force: effectiveOptions.force === true,
+    ignoreScripts: effectiveOptions.ignoreScripts !== false
   });
 
-  await runNpmInstall(pluginPath, options, logger);
+  await runNpmInstall(pluginPath, effectiveOptions, logger);
   return { installed: true, dependencies: missing };
 }
 
